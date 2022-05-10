@@ -7,22 +7,17 @@ import (
 	"strings"
 	"github.com/gorilla/websocket"
 	"encoding/json"
+	"github.com/segmentio/ksuid"
+	
 );
 
-type GameInstance struct{
-	GameID string
-	GameState string
-	Player1UID string //white player UID
-	Player2UID string //black player UID
-	Player1Name string //white player username, limited to 32 alphanum chars
-	Player2Name string //black player username, limited to 32 alphanum chars
-}
+
 //https://www.chessprogramming.org/Extended_Position_Description
 //My game state is going to be recorded using EPD for compatibility with chess variants
 //idk if i'll actually implement chess variants, but it's always good to think ahead
-const DEFAULT_GAME_STATE string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -";
 
-var gameMap map[string]GameInstance = make(map[string]GameInstance);
+
+
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize: 1024,
@@ -43,57 +38,27 @@ func webSocketHandler(w http.ResponseWriter, r *http.Request){
 
 
 
-	msgType, msg, err := conn.ReadMessage();
-	if(err!=nil){
-		log.Println(err);
-		return;
-	}
-
-	type TestPayloadType struct {
-		A string  `json:"a"`
-		B []int		`json:"b"`
-		C float64	`json:"c"`
-	}
-	//this is probably one of my least favourite parts about go so far
-	type ActionType struct {
-		Type string `json:"type"`
-		Payload json.RawMessage `json:"payload"`
-	}
-	type MessageType struct {
-		GameID string `json:"gameID"` //LIKE WHAT IS THIS EVEN
-		Action ActionType `json:"action"` //i think it's a bit silly to have a language opinionated on what case you use
-	}
 
 
 
 
-	if(msg!=nil){
-		log.Println("Message received!");
-		if(msgType == 1){
 
-			log.Println(string(msg));
-			var parsedMsg MessageType;
-			
-			json.Unmarshal(msg, &parsedMsg);
-			parsedAction := parsedMsg.Action;
-			log.Println(parsedAction);
-			log.Println("gameID: " + parsedMsg.GameID);
-			log.Println("type: " + parsedAction.Type);
-			var parsedPayload TestPayloadType;
-			log.Println(parsedAction.Payload);
-			json.Unmarshal(parsedAction.Payload, &parsedPayload);
-			log.Println(parsedPayload);
-			
-
-		}else if(msgType == 2){
-			log.Println("Bytecoded message");
-		} else {
-			log.Panicln("Message is not in text format.");
-		}
-		conn.WriteMessage(1, []byte("Hello from Go, message received."));
-	}
-	
 }
+	
+
+
+
+
+func authenticateChessUID(game *GameInstance, chessUID ksuid.KSUID)bool{
+	if(chessUID == game.Player1UID ||chessUID == game.Player2UID){
+				return true;
+			} else {
+				return false;
+			}
+}
+
+
+
 
 
 
@@ -118,12 +83,6 @@ func handleAction(actionMsg []byte){
 
 	}
 	}
-
-
-
-
-	
-
 }
 
 
@@ -131,10 +90,7 @@ func handleAction(actionMsg []byte){
 
 func main(){
 
-	mux := http.NewServeMux();
-
-	mux.HandleFunc("/ws", webSocketHandler);
-
+	mux := CreateMux();
 	println("Now listening on localhost:3001...");
 	log.Fatal(http.ListenAndServe("localhost:3001", mux));
 }
