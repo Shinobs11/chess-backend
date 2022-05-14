@@ -1,13 +1,19 @@
 package main
 
 import (
+	"strings"
 	"encoding/json"
 	"log"
 	"net/http"
-
+	// "net/http/cookiejar"
 	"github.com/gorilla/websocket"
 	"github.com/segmentio/ksuid"
+	"net/url"
 )
+
+var localURL url.URL = url.URL{
+	Host: "localhost",
+}
 
 func CreateMux()(*WrappedHandler){
 	mux := http.NewServeMux();
@@ -18,9 +24,32 @@ func CreateMux()(*WrappedHandler){
 
 
 
+var upgrader = websocket.Upgrader{
+	ReadBufferSize: 1024,
+	WriteBufferSize: 1024,
+	//TODOS: Come back and make the CheckOrigin actually check the origin.
+	CheckOrigin: func(r *http.Request) bool{
+		return (strings.Split(r.RemoteAddr, ":")[0] == "127.0.0.1");
+	},
+}
+
+
+
+
+// var cookieJar, _ = cookiejar.New(&cookiejar.Options{
+// //todos: figure out if you need options
+// })
+
+// var dialer = websocket.Dialer{
+// 	Jar: cookieJar, 
+// }
 
 func WebSocketHandler(w http.ResponseWriter, r *http.Request){
-	conn, err := upgrader.Upgrade(w, r, nil)
+	// header:= http.Header{
+
+	// }
+	
+	conn, err := upgrader.Upgrade(w, r, w.Header());
 	if err != nil {
 		log.Println(err);
 		return;
@@ -34,10 +63,12 @@ func WebSocketHandler(w http.ResponseWriter, r *http.Request){
 	}
 
 	if (msgType == 1){
-
+		MessageHandler(msg, conn, r);
 	} else{
 		log.Printf("Unexpected message type, returning...");
 	}
+	
+
 
 
 }
@@ -45,8 +76,8 @@ func WebSocketHandler(w http.ResponseWriter, r *http.Request){
 
 
 
-func MessageHandler(message []byte, w http.ResponseWriter, r *http.Request){
-
+func MessageHandler(message []byte, conn *websocket.Conn, r *http.Request){
+	log.Printf("Message received");
 	//first things first, find out the requested game.
 	var parsedMessage ActionType;
 	err := json.Unmarshal(message, &parsedMessage);
@@ -55,9 +86,15 @@ func MessageHandler(message []byte, w http.ResponseWriter, r *http.Request){
 	}
 
 	switch(parsedMessage.Type){
-		case "CreateGame":
+		case "WebSocketOpen":
+			log.Printf("WebSocketOpen message received.");
 			
-			break;
+		case "CreateGame":
+			//No more json unmarshalling required as all data will be from cookies
+			log.Printf("CreateGame message received");
+			CreateGame(conn, r);
+			
+			
 		case "RequestDraw":
 			break;
 		case "Resign":
@@ -68,6 +105,8 @@ func MessageHandler(message []byte, w http.ResponseWriter, r *http.Request){
 			break;
 		case "RequestLegalMoves":
 			break;
+		case "RequestChessUID":
+			break;
 		default:
 			return;	
 	}
@@ -75,12 +114,7 @@ func MessageHandler(message []byte, w http.ResponseWriter, r *http.Request){
 	//this syntax is disgusting but it's how it's supposed to be done ig
 	//(note for me): basically it's `if (initializer, condition) {code...}`
 
-	if game, ok := gameMap[parsedMessage.GameID]; ok {
-		
-	} else{
-		//game was not found, 
-	}
-	
+
 
 
 }
@@ -113,12 +147,12 @@ func getGameUID(r *http.Request)(ksuid.KSUID){
 	return gameUID;
 }
 
-func setGameUID(w http.ResponseWriter, game *GameInstance){
+func generateGameUIDCookie(game *GameInstance)(http.Cookie){
 	gameUIDCookie := http.Cookie{
 		Name: "gameUID",
 		Value: game.GameUID.String(),
 		Domain: "localhost",
 		SameSite: http.SameSiteDefaultMode,
 	}
-	http.SetCookie(w, &gameUIDCookie);
+	return gameUIDCookie;
 }
