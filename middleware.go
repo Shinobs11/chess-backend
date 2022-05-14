@@ -28,11 +28,12 @@ func (wh *WrappedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request){
 			Name: "chessUID",
 			Value: string(newID.String()),
 			Domain: "localhost",
-			SameSite: http.SameSiteDefaultMode,
+			SameSite: http.SameSiteNoneMode,
 			//consider checking out rest of options
 		}
-
-		http.SetCookie(w, &cookie)
+		// log.Printf("Cookie created, attempting to set into cookie jar.")
+		http.SetCookie(w, &cookie);
+		// cookieJar.SetCookies(&localURL, []*http.Cookie{&cookie});
 	}
 	wh.handler.ServeHTTP(w, r);	
 }

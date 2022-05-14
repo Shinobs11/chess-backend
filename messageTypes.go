@@ -1,8 +1,9 @@
 package main
+
 import (
 	"encoding/json"
+	"net/http"
 )
-
 
 //i know this will "work"
 //but i have no idea if it's remotely close to "best practices"
@@ -10,7 +11,7 @@ type ActionType struct {
 	Type string `json:"type"`
 	Payload json.RawMessage `json:"payload"`
 }
-
+//receiving payloads
 type CreateGamePayload struct { // done
 
 }
@@ -35,6 +36,11 @@ type RequestLegalMovesPayload struct {
 
 }
 
+//responding payloads
+type CreateGameResponsePayload struct {
+	GameState string `json:"gameState"`
+	GameUIDCookie http.Cookie `json:"gameUIDCookie"`
+}
 
 
 /*

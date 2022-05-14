@@ -1,11 +1,13 @@
 package main
 
-
 import (
+	"encoding/json"
 	"log"
 	"net/http"
-	"github.com/segmentio/ksuid"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/segmentio/ksuid"
 )
 
 const DEFAULT_GAME_STATE string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -";
@@ -22,7 +24,7 @@ type GameInstance struct{
 }
 var gameMap map[ksuid.KSUID]GameInstance = make(map[ksuid.KSUID]GameInstance);
 
-func CreateGame(w http.ResponseWriter, r *http.Request){
+func CreateGame(conn *websocket.Conn, r *http.Request){
 	chessUID := getChessUID(r);
 	if chessUID == ksuid.Nil{
 		log.Printf("User does not have chessUID, cannot create game. Returning...");
@@ -43,8 +45,29 @@ func CreateGame(w http.ResponseWriter, r *http.Request){
 					}
 	}
 		
-	setGameUID(w, &newGameInstance);
-	//TODOS: Create response to request w/ game state so one less message needs to be sent
+	
+
+	resPayload := CreateGameResponsePayload{
+		GameState: newGameInstance.GameState,
+		GameUIDCookie: generateGameUIDCookie(&newGameInstance),
+	}
+
+	jsonifiedResPayload, err := json.Marshal(resPayload);
+	if err!=nil{
+		log.Printf("Error marshalling CreateGameResponsePayload, %s", err.Error());
+	}
+
+	resAction := ActionType{
+		Type: "CreateGameResponse",
+		Payload: jsonifiedResPayload,
+	}
+	
+	jsonifiedResAction, err := json.Marshal(resAction);
+	if err!=nil{
+		log.Printf("Error marshalling Action for CreateGameResponse, %s", err.Error());
+	}
+	
+	conn.WriteMessage(1, jsonifiedResAction)
 }
 
 func CreateNewGameInstance(chessUID ksuid.KSUID)(GameInstance){
@@ -65,9 +88,10 @@ func CreateNewGameInstance(chessUID ksuid.KSUID)(GameInstance){
 	}
 }
 
+
 func RequestDraw(w http.ResponseWriter, r *http.Request){
-	gameUID := getGameUID(r);
-	chessUID := getChessUID(r);
+	// gameUID := getGameUID(r);
+	// chessUID := getChessUID(r);
 
 	//todos: actually write the function
 
@@ -95,4 +119,8 @@ func RequestLegalMoves(w http.ResponseWriter, r *http.Request){
 func RequestGameState(w http.ResponseWriter, r *http.Request){
 	//todos: actually write the function
 
+}
+
+func RequestChessUID(w http.Response, r *http.Request){
+	return; //i don't think i need to do anything, middleware should take care of it.
 }
